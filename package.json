@@ -1,0 +1,40 @@
+{
+  "name": "react-h3-map",
+  "version": "0.1.0",
+  "description": "Tiny, fast React map (OSM/MapLibre) rendering H3 hexagons on the GPU",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "build:demo": "vite build",
+    "dev": "vite",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "h3-js": ">=4",
+    "maplibre-gl": ">=4",
+    "react": ">=18",
+    "react-dom": ">=18"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "h3-js": "^4.1.0",
+    "maplibre-gl": "^4.7.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "typescript": "^5.5.4",
+    "vite": "^5.4.0"
+  }
+}

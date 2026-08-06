@@ -1,0 +1,40 @@
+// 📚 Общие типы библиотеки — начинать чтение кода лучше отсюда.
+
+/**
+ * 🧱 Одна ячейка: индекс H3 и число.
+ * Компактный формат (массив пар вместо массива объектов) выбран не случайно:
+ * на 100 000 записей это вдвое меньше трафика и заметно быстрее JSON.parse. ⚡
+ */
+export type H3Cell = [h3: string, value: number];
+
+/** 🎨 Цвет как четыре канала 0..255. */
+export type RGBA = [r: number, g: number, b: number, a: number];
+
+/** 🌈 Описание палитры. */
+export interface Palette {
+  /** Цвета шкалы от min к max. CSS hex ("#rrggbb"/"#rrggbbaa") или RGBA 0..255. */
+  colors: (string | RGBA)[];
+  /** Диапазон значений. Если не задан — считается по данным (min/max). */
+  domain?: [number, number];
+  /** Глобальная непрозрачность 0..1, умножается на альфу цветов. */
+  opacity?: number;
+}
+
+/** 👆 Что под курсором (или под пальцем) — приходит в onHover / onClick / tooltip. */
+export interface HoverInfo {
+  h3: string; // 🧱 индекс ячейки
+  value: number; // 🔢 её значение
+  /** 🖥️ Экранные координаты — по ним позиционируется тултип. */
+  x: number;
+  y: number;
+  lng: number; // 🌍 географические координаты точки
+  lat: number;
+}
+
+/** 🔭 Текущий вид карты — то, что уходит в `fetchData`. */
+export interface Viewport {
+  bbox: [west: number, south: number, east: number, north: number]; // 🖼️ границы экрана
+  zoom: number;
+  /** 📏 Рекомендованное разрешение H3 для текущего зума. */
+  resolution: number;
+}
