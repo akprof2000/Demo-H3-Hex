@@ -293,7 +293,7 @@ export function H3Map({
       )}
       {/* 🌈 Легенда палитры */}
       {legend !== false && cells.length > 0 && (
-        <Legend scale={scale} title={legend.title} format={legend.format} />
+        <Legend scale={scale} title={legend.title} format={legend.format} cells={cells} />
       )}
       {/* 🧩 Своя панель управления и что угодно ещё */}
       {children}

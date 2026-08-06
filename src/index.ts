@@ -1,7 +1,7 @@
 export { H3Map, type H3MapProps } from './H3Map';
 export { H3HexLayer, type HexLayerOptions } from './H3HexLayer';
 export { Legend, type LegendProps } from './Legend';
-export { ColorScale, DEFAULT_PALETTE, domainOf } from './palette';
+export { ColorScale, DEFAULT_PALETTE, RSRP_PALETTE, domainOf } from './palette';
 export { osmStyle } from './mapStyle';
 export {
   useViewportData,
@@ -21,4 +21,4 @@ export {
   type EdgeMode,
   type HexMesh,
 } from './geometry';
-export type { H3Cell, HoverInfo, Palette, RGBA, Viewport } from './types';
+export type { H3Cell, HoverInfo, Palette, PaletteBin, RGBA, Viewport } from './types';

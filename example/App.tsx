@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 import {
   H3Map,
+  RSRP_PALETTE,
   edgeModeForView,
   type EdgeMode,
   type Fetcher,
@@ -19,13 +20,21 @@ const EDGE_LABEL: Record<EdgeMode, string> = {
   none: 'без обводки',
 };
 
-/** Демо Москвы: разрешение H3 от 6 (город целиком) до 14 (дом). */
+/**
+ * 📏 Демо Москвы: разрешение H3 от 6 (город целиком) до 14 (дом).
+ *
+ * Шаг разрешения в H3 — это ребро примерно в 2.6 раза меньше и в 7 раз больше
+ * ячеек на той же площади. Здесь взят на уровень мельче «интуитивного» `zoom - 3`,
+ * чтобы на экран влезало заметно больше гексагонов. 🔍
+ */
 function moscowResolution(zoom: number): number {
-  const r = Math.round(zoom) - 3;
+  const r = Math.round(zoom) - 2;
   return r < 6 ? 6 : r > 14 ? 14 : r;
 }
 
 const PALETTES: Record<string, Palette> = {
+  // 📶 Дискретная шкала RSRP — стандартные пороги радиопланирования
+  'RSRP (пороги)': RSRP_PALETTE,
   Инферно: {
     colors: ['#2b0b3f', '#5b1f7a', '#a52f7a', '#e05c4f', '#f7a838', '#f9f871'],
     opacity: 0.78,
@@ -54,7 +63,7 @@ const panel: React.CSSProperties = {
 };
 
 export default function App() {
-  const [paletteName, setPaletteName] = useState<keyof typeof PALETTES>('Инферно');
+  const [paletteName, setPaletteName] = useState<keyof typeof PALETTES>('RSRP (пороги)');
   const [stats, setStats] = useState({ cells: 0, res: 0, ms: 0, edges: 'none' as EdgeMode });
   const [picked, setPicked] = useState<HoverInfo | null>(null);
   const t0 = useRef(0);
@@ -82,17 +91,17 @@ export default function App() {
       palette={PALETTES[paletteName]}
       workerThreshold={5000}
       workerFactory={workerFactory}
-      legend={{ title: 'Условная метрика', format: (v) => v.toFixed(0) }}
+      legend={{ title: 'Агрегация Best · rsrp', format: (v) => v.toFixed(0) }}
       onClick={setPicked}
       tooltip={(i) => (
         <>
           <div style={{ opacity: 0.65 }}>{i.h3}</div>
-          <div style={{ fontSize: 14 }}>{i.value}</div>
+          <div style={{ fontSize: 14 }}>{i.value} дБм</div>
         </>
       )}
     >
       <div style={panel}>
-        <div style={{ fontWeight: 600, marginBottom: 6 }}>react-h3-map · Москва</div>
+        <div style={{ fontWeight: 600, marginBottom: 6 }}>react-h3-map · Москва · RSRP</div>
         <label style={{ display: 'block', marginBottom: 8 }}>
           Палитра{' '}
           <select
@@ -110,7 +119,7 @@ export default function App() {
         <div>Загрузка + сборка: <b>{stats.ms} мс</b></div>
         <div>Обводка: <b>{EDGE_LABEL[stats.edges]}</b></div>
         <div style={{ marginTop: 6, opacity: 0.75 }}>
-          {picked ? `Клик: ${picked.h3} = ${picked.value}` : 'Кликните по гексагону'}
+          {picked ? `Клик: ${picked.h3} = ${picked.value} дБм` : 'Кликните по гексагону'}
         </div>
       </div>
     </H3Map>
