@@ -1,6 +1,6 @@
 {
   "name": "react-h3-map",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Tiny, fast React map (OSM/MapLibre) rendering H3 hexagons on the GPU",
   "type": "module",
   "main": "./dist/index.js",
