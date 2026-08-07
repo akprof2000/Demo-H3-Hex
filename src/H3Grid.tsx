@@ -94,6 +94,24 @@ export interface H3GridProps {
   /** 📊 Статистика после каждой пересборки сетки. */
   onGrid?: (info: GridInfo) => void;
 
+  /**
+   * 📋 Копировать индекс ячейки в буфер обмена по клику. По умолчанию включено.
+   *
+   * Копирование запускается только из обработчика клика — то есть по прямому
+   * действию пользователя. Иначе браузер бы его и не разрешил.
+   */
+  copyOnClick?: boolean;
+  /**
+   * ✅ Результат копирования: индекс и получилось ли.
+   * Не получиться может, например, в iframe без разрешения на запись в буфер.
+   */
+  onCopy?: (h3: string, ok: boolean) => void;
+  /**
+   * 💬 Всплывающее подтверждение «скопировано». По умолчанию показывается
+   * на 1.2 секунды; `false` — выключить, строка — свой текст.
+   */
+  copyToast?: false | string;
+
   /** 💬 false — выключить встроенную подсказку с индексом ячейки. */
   tooltip?: false | ((h3: string) => ReactNode);
 
@@ -116,6 +134,55 @@ const tipStyle: CSSProperties = {
   whiteSpace: 'nowrap',
   zIndex: 2,
 };
+
+// 💬 Всплывающее подтверждение копирования — по центру снизу, поверх карты
+const toastStyle: CSSProperties = {
+  position: 'absolute',
+  left: '50%',
+  bottom: 28,
+  transform: 'translateX(-50%)',
+  pointerEvents: 'none',
+  padding: '7px 12px',
+  borderRadius: 6,
+  background: 'rgba(20,22,28,0.92)',
+  color: '#e8eaed',
+  font: '13px/1.3 system-ui, sans-serif',
+  whiteSpace: 'nowrap',
+  zIndex: 4,
+};
+
+/**
+ * 📋 Копирование строки в буфер обмена.
+ *
+ * Основной путь — `navigator.clipboard`, но он живёт только в защищённом
+ * контексте: https или localhost. Открытое по http://192.168.x.x демо (типичная
+ * ситуация при показе коллеге с телефона) его просто не увидит, поэтому есть
+ * запасной вариант через временное скрытое поле и устаревший `execCommand`. 🩹
+ */
+async function copyText(text: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    // 🤫 Отказ в доступе — не повод падать, пробуем запасной путь
+  }
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    // 🙈 Прячем поле за пределами экрана: оно не должно мигнуть перед глазами
+    ta.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0';
+    ta.setAttribute('readonly', ''); // 📵 чтобы на мобильных не выехала клавиатура
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand('copy'); // ⚠️ устарел, но работает везде
+    document.body.removeChild(ta);
+    return ok;
+  } catch {
+    return false; // 🚫 совсем не вышло — сообщим через onCopy
+  }
+}
 
 /**
  * 🎨 Цвет в формат GL: четыре числа 0..1.
@@ -167,6 +234,9 @@ export function H3Grid({
   onHover,
   onClick,
   onGrid,
+  copyOnClick = true,
+  onCopy,
+  copyToast,
   tooltip,
   className,
   style,
@@ -177,12 +247,16 @@ export function H3Grid({
   const [map, setMap] = useState<MlMap | null>(null);
   const [ready, setReady] = useState(false); // ✅ карта загружена и слой добавлен
   const [hover, setHover] = useState<{ h3: string; x: number; y: number } | null>(null);
+  // 📋 Индекс, только что скопированный в буфер (null — подтверждение погасло)
+  const [copied, setCopied] = useState<string | null>(null);
 
   // 📌 Свежие ссылки на колбэки без переподписки на события карты:
   // если класть onGrid прямо в зависимости эффекта, каждая новая стрелка
   // в родителе будет отписывать и переподписывать обработчики. ♻️
   const onGridRef = useRef(onGrid);
   onGridRef.current = onGrid;
+  const onCopyRef = useRef(onCopy);
+  onCopyRef.current = onCopy;
 
   // 1️⃣ Создание карты — ровно один раз за жизнь компонента
   useEffect(() => {
@@ -319,6 +393,15 @@ export function H3Grid({
       setHover({ h3, x: e.point.x, y: e.point.y });
       if (highlight) layerRef.current?.setHighlight(h3);
       onClick?.(h3);
+
+      // 📋 Копирование индекса. Промис намеренно не ждём: обработчик клика
+      // должен завершиться сразу, иначе карта подтормаживает на тапе.
+      if (copyOnClick) {
+        copyText(h3).then((ok) => {
+          onCopyRef.current?.(h3, ok);
+          if (ok) setCopied(h3); // 💬 подтверждение исчезнет само по таймеру
+        });
+      }
     };
 
     map.on('mousemove', onMove);
@@ -329,7 +412,15 @@ export function H3Grid({
       map.off('mouseout', onLeave);
       map.off('click', onTap);
     };
-  }, [map, ready, currentResolution, highlight, onHover, onClick]);
+  }, [map, ready, currentResolution, highlight, onHover, onClick, copyOnClick]);
+
+  // ⏱️ Подтверждение «скопировано» гасим через 1.2 секунды. Таймер сбрасывается
+  // на каждый новый клик, поэтому при быстрых кликах подряд оно не мигает.
+  useEffect(() => {
+    if (!copied) return;
+    const t = setTimeout(() => setCopied(null), 1200);
+    return () => clearTimeout(t);
+  }, [copied]);
 
   // ✨ Цвет подсветки — тоже без перестроения геометрии
   useEffect(() => {
@@ -350,6 +441,16 @@ export function H3Grid({
       {tooltip !== false && hover && (
         <div style={{ ...tipStyle, left: hover.x, top: hover.y }}>
           {tooltip ? tooltip(hover.h3) : hover.h3}
+        </div>
+      )}
+      {/* 💬 «Скопировано» — гаснет само через 1.2 секунды */}
+      {copyToast !== false && copied && (
+        <div style={toastStyle}>
+          {copyToast ?? (
+            <>
+              📋 Скопировано: <b style={{ font: '13px ui-monospace, monospace' }}>{copied}</b>
+            </>
+          )}
         </div>
       )}
       {/* 🧩 Своя панель управления и что угодно ещё */}

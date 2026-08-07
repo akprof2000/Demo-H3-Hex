@@ -141,7 +141,7 @@ export default function GridDemo() {
           <div style={{ color: '#f59e0b' }}>Слишком мелко для этого масштаба — приблизьте карту</div>
         )}
         <div style={{ marginTop: 6, opacity: 0.75 }}>
-          {picked ? `Клик: ${picked}` : 'Кликните по гексагону'}
+          {picked ? `Клик: ${picked}` : 'Кликните по гексагону — индекс уйдёт в буфер обмена'}
         </div>
       </div>
     </H3Grid>
