@@ -1,0 +1,58 @@
+name: Release
+
+# 🏷️ Запускается на пуш тега вида v0.2.0 (или вручную из вкладки Actions).
+# Тег — единственный источник правды о версии: он же попадает в имя релиза.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write # ✍️ нужно, чтобы экшен смог создать сам релиз
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      # ⚙️ v5 экшенов работают на Node 24 — иначе GitHub ругается на устаревший Node 20
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - run: npm ci
+
+      # 🛡️ Проверки до сборки: сломанные типы не должны доехать до релиза
+      - run: npm run typecheck
+
+      # 🔍 Версия в package.json обязана совпадать с тегом, иначе в npm-пакете
+      # окажется одно, а в релизе — другое. Ловим это здесь, а не у пользователя.
+      - name: Проверить, что версия совпадает с тегом
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG=$(node -p "require('./package.json').version")
+          echo "тег=$TAG package.json=$PKG"
+          test "$TAG" = "$PKG"
+
+      # 🏗️ Собираем библиотеку (dist/) и демо (dist-demo/)
+      - run: npm run build
+      - run: npm run build:demo
+
+      # 📦 Тарбол ровно того содержимого, что ушло бы в npm publish
+      - name: Собрать npm-тарбол
+        run: npm pack
+
+      # 🗂️ Демо отдельным архивом — можно развернуть на любом статик-хостинге
+      - name: Упаковать демо
+        run: tar -czf demo-${{ github.ref_name }}.tar.gz -C dist-demo .
+
+      - name: Создать релиз
+        uses: softprops/action-gh-release@v2
+        with:
+          # 📝 Описание берётся из CHANGELOG-секции этого тега, если она есть,
+          # иначе GitHub сам соберёт список коммитов.
+          generate_release_notes: true
+          files: |
+            *.tgz
+            demo-*.tar.gz
