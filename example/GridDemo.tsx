@@ -41,6 +41,8 @@ export default function GridDemo() {
   // 🎯 Желаемый размер ребра гексагона на экране (только для режима 'auto')
   const [target, setTarget] = useState(40);
   const [colorName, setColorName] = useState<keyof typeof COLORS>('Чёрная');
+  // 📏 Толщина линий в CSS-пикселях: меняется на GPU, без пересборки геометрии
+  const [lineWidth, setLineWidth] = useState(2);
   // 📊 Статистика последней пересборки сетки
   const [info, setInfo] = useState<GridInfo | null>(null);
   // 🖱️ Индекс ячейки, по которой кликнули
@@ -51,6 +53,7 @@ export default function GridDemo() {
       resolution={res}
       targetEdgePixels={target}
       color={COLORS[colorName]}
+      lineWidth={lineWidth}
       center={[37.6173, 55.7558]} // 🏙️ Москва, Кремль
       zoom={11}
       minZoom={3}
@@ -108,6 +111,20 @@ export default function GridDemo() {
               <option key={k}>{k}</option>
             ))}
           </select>
+        </label>
+
+        {/* 📏 Толщина линий: перерисовка мгновенная, поэтому ползунок без дебаунса */}
+        <label style={{ display: 'block' }}>
+          Толщина линии: {lineWidth} px
+          <input
+            type="range"
+            min={1}
+            max={8}
+            step={0.5}
+            value={lineWidth}
+            onChange={(e) => setLineWidth(Number(e.target.value))}
+            style={{ width: '100%' }}
+          />
         </label>
 
         <div style={{ marginTop: 6 }}>

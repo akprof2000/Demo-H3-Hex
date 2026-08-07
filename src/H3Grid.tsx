@@ -63,8 +63,17 @@ export interface H3GridProps {
    * По умолчанию чёрный с альфой 0.45 — он лучше всего читается на тайлах OSM.
    */
   color?: string | [number, number, number, number];
+  /**
+   * 📏 Толщина линий сетки в CSS-пикселях. По умолчанию 2.
+   *
+   * Толщина считается на GPU, поэтому её смена не перестраивает геометрию —
+   * это ровно один кадр независимо от числа гексагонов.
+   */
+  lineWidth?: number;
   /** ✨ Цвет контура ячейки под курсором. Формат тот же. */
   highlightColor?: string | [number, number, number, number];
+  /** 📏 Толщина контура выделения. По умолчанию на пиксель толще сетки. */
+  highlightWidth?: number;
   /** 🖱️ false — не подсвечивать ячейку под курсором. По умолчанию подсвечивать. */
   highlight?: boolean;
 
@@ -145,7 +154,9 @@ export function H3Grid({
   targetEdgePixels = 40,
   maxCells = 60_000,
   color,
+  lineWidth = 2,
   highlightColor,
+  highlightWidth,
   highlight = true,
   debounceMs = 120,
   center = [37.6173, 55.7558],
@@ -324,6 +335,11 @@ export function H3Grid({
   useEffect(() => {
     layerRef.current?.setHighlightColor(glHighlight);
   }, [glHighlight, ready]);
+
+  // 📏 Толщина линий: живёт в uniform, поэтому меняется мгновенно
+  useEffect(() => {
+    layerRef.current?.setWidth(lineWidth, highlightWidth ?? lineWidth + 1);
+  }, [lineWidth, highlightWidth, ready]);
 
   // 🖼️ Разметка: canvas карты + слои интерфейса поверх него
   return (

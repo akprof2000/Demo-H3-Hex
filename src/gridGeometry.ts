@@ -20,14 +20,45 @@ import { edgePixels, latToMercY, lngToMercX } from './geometry';
 /** 🖼️ Прямоугольник видимой области: [запад, юг, восток, север] в градусах. */
 export type BBox = [west: number, south: number, east: number, north: number];
 
-/** 📦 Готовый к отправке в GPU набор линий сетки. */
-export interface GridMesh {
-  /** ➖ Пары вершин отрезков (gl.LINES), в mercator-координатах ОТНОСИТЕЛЬНО origin. */
+/**
+ * 📦 Линии, развёрнутые в треугольники — готовый к отправке в GPU набор буферов.
+ *
+ * ⚠️ Почему не `gl.LINES` с `gl.lineWidth(2)`: толщина линии больше 1 в WebGL
+ * не поддерживается практически нигде. В спецификации она разрешена, но ANGLE
+ * (а через него — Chrome и Edge на Windows) жёстко ограничивает диапазон
+ * значением 1, и вызов просто ничего не делает. Единственный работающий способ
+ * получить толстую линию — нарисовать её прямоугольником из двух треугольников
+ * и раздвинуть его на нужную ширину прямо в вершинном шейдере. 📐
+ *
+ * Отсюда и три буфера вместо одного: на каждый отрезок приходится 4 вершины,
+ * и каждая должна знать, куда смещаться.
+ */
+export interface LineMesh {
+  /** 📍 Вершина отрезка — та, из которой она «выросла» (mercator, минус origin). */
   positions: Float32Array;
+  /** 👉 Второй конец того же отрезка: по нему шейдер считает направление. */
+  others: Float32Array;
+  /** ↔️ Сторона смещения: +1 или −1 (в какую сторону от оси отрезка отойти). */
+  sides: Float32Array;
+  /** 🔺 Индексы треугольников: 6 на отрезок (два треугольника на прямоугольник). */
+  indices: Uint32Array;
+  /** 🔢 Сколько индексов рисовать. */
+  indexCount: number;
+}
+
+/** 🕳️ Пустой набор линий. */
+export const EMPTY_LINES: LineMesh = {
+  positions: new Float32Array(0),
+  others: new Float32Array(0),
+  sides: new Float32Array(0),
+  indices: new Uint32Array(0),
+  indexCount: 0,
+};
+
+/** 📦 Готовый к отправке в GPU набор линий сетки. */
+export interface GridMesh extends LineMesh {
   /** 🧭 Мировая точка отсчёта, вычтенная из positions (борьба с точностью float32). */
   origin: [number, number];
-  /** 🔢 Сколько вершин рисовать: positions.length / 2. */
-  vertexCount: number;
   /** 🧱 Ячейки, попавшие в сетку — нужны для пикинга и статистики. */
   cells: string[];
   /** 📏 Разрешение H3, на котором построена сетка. */
@@ -36,12 +67,98 @@ export interface GridMesh {
 
 /** 🕳️ Пустая сетка — отдаём вместо null, чтобы не плодить проверки. */
 export const EMPTY_GRID: GridMesh = {
-  positions: new Float32Array(0),
+  ...EMPTY_LINES,
   origin: [0, 0],
-  vertexCount: 0,
   cells: [],
   resolution: 0,
 };
+
+/**
+ * 📐 Пары точек → прямоугольники.
+ *
+ * На вход — плоский массив отрезков: x0,y0, x1,y1, x0,y0, x1,y1, … (ровно тот
+ * формат, что раньше уходил в `gl.LINES`). На выход — четыре буфера, из которых
+ * вершинный шейдер соберёт полоску нужной толщины.
+ *
+ * Раскладка на один отрезок AB:
+ * ```
+ *   вершина 0: pos=A other=B side=+1     0 ──── 2     ↑ side +1
+ *   вершина 1: pos=A other=B side=−1     │      │     ось отрезка A→B
+ *   вершина 2: pos=B other=A side=−1     1 ──── 3     ↓ side −1
+ *   вершина 3: pos=B other=A side=+1
+ * ```
+ * ⚠️ У вершин 2 и 3 знак `side` перевёрнут: направление отрезка для них тоже
+ * противоположно (B→A), и без этой перестановки прямоугольник свернулся бы
+ * восьмёркой — «песочными часами» на экране. ⏳
+ *
+ * ⚠️ Второй подвох — порядок индексов. Треугольники обязаны обходиться в одну
+ * сторону: при разном обходе включённое отсечение задних граней съедает ровно
+ * половину прямоугольника, и линия выходит вдвое тоньше заказанной, причём
+ * смещённой на свою толщину. Ловится это только глазами или подсчётом пикселей,
+ * поэтому: обход по кольцу 0 → 1 → 3 → 2, а не «0-1-2 / 0-2-3». 🔁
+ */
+export function expandSegments(segs: Float32Array): LineMesh {
+  const segCount = segs.length / 4; // 🔢 4 числа (две точки) на отрезок
+  if (segCount === 0) return EMPTY_LINES;
+
+  const positions = new Float32Array(segCount * 4 * 2); // 4 вершины × (x, y)
+  const others = new Float32Array(segCount * 4 * 2);
+  const sides = new Float32Array(segCount * 4);
+  const indices = new Uint32Array(segCount * 6); // 🔺 два треугольника на отрезок
+
+  for (let s = 0; s < segCount; s++) {
+    const ax = segs[s * 4];
+    const ay = segs[s * 4 + 1];
+    const bx = segs[s * 4 + 2];
+    const by = segs[s * 4 + 3];
+
+    const v = s * 4; // 📌 индекс первой вершины этого отрезка
+    // 📍 Две вершины «растут» из A и смотрят на B, две — наоборот
+    for (const [i, px, py, ox, oy, side] of [
+      [0, ax, ay, bx, by, 1],
+      [1, ax, ay, bx, by, -1],
+      [2, bx, by, ax, ay, -1],
+      [3, bx, by, ax, ay, 1],
+    ] as const) {
+      positions[(v + i) * 2] = px;
+      positions[(v + i) * 2 + 1] = py;
+      others[(v + i) * 2] = ox;
+      others[(v + i) * 2 + 1] = oy;
+      sides[v + i] = side;
+    }
+
+    // 🔺 Прямоугольник из двух треугольников по кольцу 0 → 1 → 3 → 2:
+    // оба обходятся в одну сторону (см. предупреждение в описании функции)
+    const t = s * 6;
+    indices[t] = v;
+    indices[t + 1] = v + 1;
+    indices[t + 2] = v + 3;
+    indices[t + 3] = v;
+    indices[t + 4] = v + 3;
+    indices[t + 5] = v + 2;
+  }
+
+  return { positions, others, sides, indices, indexCount: indices.length };
+}
+
+/**
+ * 🔁 Замкнутый контур (x0,y0, x1,y1, …) → отрезки в формате `expandSegments`.
+ * Нужен для подсветки ячейки под курсором: раньше её рисовал `gl.LINE_LOOP`,
+ * который тоже умеет толщину только в 1 пиксель.
+ */
+export function loopToSegments(loop: Float32Array): Float32Array {
+  const n = loop.length / 2; // 🔢 точек в контуре
+  if (n < 2) return new Float32Array(0);
+  const out = new Float32Array(n * 4); // ➖ столько же отрезков, сколько точек
+  for (let k = 0; k < n; k++) {
+    const next = (k + 1) % n; // 🔁 последняя точка замыкается на первую
+    out[k * 4] = loop[k * 2];
+    out[k * 4 + 1] = loop[k * 2 + 1];
+    out[k * 4 + 2] = loop[next * 2];
+    out[k * 4 + 3] = loop[next * 2 + 1];
+  }
+  return out;
+}
 
 // 🌍 Приблизительные размеры одного градуса на поверхности Земли, в километрах.
 // Точность здесь не важна: числа нужны только для оценки «сколько ячеек выйдет».
@@ -161,7 +278,7 @@ export function buildGridMesh(cells: string[], resolution: number): GridMesh {
       }
 
       for (let k = 0; k < pts.length - 1; k++) {
-        // ➖ gl.LINES рисует НЕзависимые отрезки: пишем обе точки каждого сегмента
+        // ➖ Копим независимые отрезки: обе точки каждого сегмента подряд
         for (const idx of [k, k + 1] as const) {
           let lng = pts[idx][0];
           // 🌍 Антимеридиан: держим отрезок цельным относительно первой точки,
@@ -175,11 +292,10 @@ export function buildGridMesh(cells: string[], resolution: number): GridMesh {
     }
   }
 
-  const positions = out.subarray(0, p); // ✂️ отдаём ровно заполненную часть
+  // ✂️ Обрезаем запас и разворачиваем отрезки в треугольники нужной толщины
   return {
-    positions,
+    ...expandSegments(out.subarray(0, p)),
     origin: [ox, oy],
-    vertexCount: p / 2, // 🔢 два числа на вершину
     cells,
     resolution,
   };

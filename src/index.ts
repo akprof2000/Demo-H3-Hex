@@ -7,10 +7,13 @@ export {
   buildGridMesh,
   cellsForBBox,
   estimateCellCount,
+  expandSegments,
+  loopToSegments,
   padBBox,
   resolutionForEdgePixels,
   type BBox,
   type GridMesh,
+  type LineMesh,
 } from './gridGeometry';
 export { Legend, type LegendProps } from './Legend';
 export { ColorScale, DEFAULT_PALETTE, RSRP_PALETTE, domainOf } from './palette';
