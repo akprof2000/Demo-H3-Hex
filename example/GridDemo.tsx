@@ -24,9 +24,12 @@ const select: React.CSSProperties = {
   padding: '2px 4px',
 };
 
-// 🎨 Пара готовых цветов сетки: тёмная подложка OSM хорошо держит светлые линии
+// 🎨 Готовые цвета сетки. Альфа задаётся прямо в hex — последние два символа.
+// Чёрная стоит первой и выбрана по умолчанию: на растровых тайлах OSM тёмная
+// линия читается лучше всего.
 const COLORS: Record<string, string> = {
-  Белая: '#ffffff59', // альфа задаётся прямо в hex, последние два символа
+  Чёрная: '#00000073',
+  Белая: '#ffffff59',
   Бирюзовая: '#22d3eeaa',
   Янтарная: '#f59e0baa',
   Красная: '#ef4444aa',
@@ -37,7 +40,7 @@ export default function GridDemo() {
   const [res, setRes] = useState<number | 'auto'>('auto');
   // 🎯 Желаемый размер ребра гексагона на экране (только для режима 'auto')
   const [target, setTarget] = useState(40);
-  const [colorName, setColorName] = useState<keyof typeof COLORS>('Белая');
+  const [colorName, setColorName] = useState<keyof typeof COLORS>('Чёрная');
   // 📊 Статистика последней пересборки сетки
   const [info, setInfo] = useState<GridInfo | null>(null);
   // 🖱️ Индекс ячейки, по которой кликнули

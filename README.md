@@ -18,7 +18,11 @@
 ```tsx
 import { H3Grid } from 'react-h3-map';
 
-<H3Grid resolution="auto" targetEdgePixels={40} color="#22d3eeaa" />;
+// по умолчанию — чёрная сетка, разрешение подбирается по зуму
+<H3Grid />;
+
+// или со своим цветом и фиксированным разрешением
+<H3Grid resolution={9} color="#22d3eeaa" />;
 ```
 
 **📋 [История изменений](CHANGELOG.md)** — версии семантические, релизы собираются

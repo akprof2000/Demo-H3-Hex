@@ -91,7 +91,10 @@ export class H3GridLayer implements CustomLayerInterface {
 
   constructor(id = 'h3-grid', opts: GridLayerOptions = {}) {
     this.id = id;
-    this.color = opts.color ?? [1, 1, 1, 0.35]; // ⚪ полупрозрачная белая сетка
+    // ⚫ По умолчанию сетка чёрная: на растровых тайлах OSM (светлые дома, серые
+    // дороги) тёмная линия читается лучше белой. Для тёмной подложки передайте
+    // светлый цвет — например, `color="#ffffff59"`.
+    this.color = opts.color ?? [0, 0, 0, 0.45];
     this.highlightColor = opts.highlightColor ?? [1, 0.85, 0.2, 1]; // 🟡 яркое выделение
   }
 

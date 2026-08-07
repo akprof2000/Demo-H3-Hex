@@ -58,7 +58,10 @@ export interface H3GridProps {
    */
   maxCells?: number;
 
-  /** 🎨 Цвет линий: CSS-строка ("#fff", "rgba(...)") или [r,g,b,a] в 0..1. */
+  /**
+   * 🎨 Цвет линий: CSS-строка ("#fff", "rgba(...)") или [r,g,b,a] в 0..1.
+   * По умолчанию чёрный с альфой 0.45 — он лучше всего читается на тайлах OSM.
+   */
   color?: string | [number, number, number, number];
   /** ✨ Цвет контура ячейки под курсором. Формат тот же. */
   highlightColor?: string | [number, number, number, number];
@@ -200,7 +203,10 @@ export function H3Grid({
   }, []);
 
   // 2️⃣ Цвета: переводим в формат GL и отдаём слою без перестроения геометрии
-  const glColor = useMemo(() => toGlColor(color, [1, 1, 1, 0.35]), [color]);
+  // ⚫ Значение по умолчанию продублировано со слоем осознанно: слой умеет жить
+  // без компонента, а компонент — без слоя (до его создания), и оба должны
+  // показывать одно и то же.
+  const glColor = useMemo(() => toGlColor(color, [0, 0, 0, 0.45]), [color]);
   const glHighlight = useMemo(() => toGlColor(highlightColor, [1, 0.85, 0.2, 1]), [highlightColor]);
   useEffect(() => {
     layerRef.current?.setColor(glColor);
