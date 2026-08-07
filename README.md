@@ -5,7 +5,8 @@
 
 Зависимости — только `react`, `maplibre-gl`, `h3-js` (все в peerDependencies). Никакого deck.gl.
 
-**▶️ [Живое демо](https://akprof2000.github.io/Demo-H3-Hex/)** — карта покрытия RSRP по Москве,
+**▶️ [Живое демо](https://akprof2000.github.io/Demo-H3-Hex/)** — две вкладки:
+«Сетка гексагонов» (`H3Grid`) и «Тепловая карта» — покрытие RSRP по Москве,
 разрешение H3 от 6 до 14 по зуму.
 
 **📖 [Подробное руководство](docs/GUIDE.md)** — как всё устроено внутри и что менять под себя.
@@ -146,7 +147,11 @@ npm install
 npm run dev
 ```
 
-Открыть http://localhost:5180 — `example/App.tsx`, мок-эндпоинт в `example/mockBackend.ts`.
+Открыть http://localhost:5180. Переключатель вкладок — `example/App.tsx`,
+тепловая карта — `example/HeatDemo.tsx` (мок-эндпоинт в `example/mockBackend.ts`),
+сетка — `example/GridDemo.tsx`.
+
+То же самое без установки — в [живом демо](https://akprof2000.github.io/Demo-H3-Hex/).
 
 ## Лицензия и тайлы
 

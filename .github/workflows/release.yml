@@ -47,12 +47,14 @@ jobs:
       - name: Упаковать демо
         run: tar -czf demo-${{ github.ref_name }}.tar.gz -C dist-demo .
 
+      # 📝 Релиз создаём через gh CLI, а не готовым экшеном: тот собран под Node 20
+      # и GitHub на каждый запуск печатает предупреждение об устаревшей версии.
+      # CLI предустановлен на раннере, так что это ещё и на одну зависимость меньше.
       - name: Создать релиз
-        uses: softprops/action-gh-release@v2
-        with:
-          # 📝 Описание берётся из CHANGELOG-секции этого тега, если она есть,
-          # иначе GitHub сам соберёт список коммитов.
-          generate_release_notes: true
-          files: |
-            *.tgz
-            demo-*.tar.gz
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes \
+            *.tgz demo-*.tar.gz
